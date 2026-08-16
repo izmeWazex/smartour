@@ -3,7 +3,7 @@
 FastAPI backend for the Smartour Ilocos Sur tourism chatbot. Fully offline —
 no external AI API required.
 
-> 📓 **Development log** — what was built, problems encountered, fixes, and the
+> **Development log** — what was built, problems encountered, fixes, and the
 > algorithms used: [`docs/DEVELOPMENT_LOG.md`](docs/DEVELOPMENT_LOG.md)
 
 ## Dependencies
@@ -150,6 +150,10 @@ You:  and to unp?                 → swaps the destination → Calle → UNP
 You:  tell me about baluarte
 Bot:  …Baluarte Zoo card…
 You:  what about its history?     → reuses the last spot → Baluarte card
+
+You:  fuel cot calle crisologo to bantay church
+Bot:  …Distance… Tell me your vehicle type…
+You:  motorcycle                  → completes the estimate → Calle → Bantay, motorcycle
 ```
 
 This works because the chat API returns a `session_id` — keep sending it with
@@ -157,7 +161,9 @@ follow-up messages (`POST /api/v1/chat/message` with `"session_id": …`). A
 fresh session (or a first message) has no memory and behaves exactly as
 before. Short follow-ups that name a spot but carry no intent keywords
 ("and to unp?") reuse the previous topic instead of falling back to a
-clarifying question.
+clarifying question. Answering the vehicle prompt with just a car word
+("motorcycle", "a sedan", "suv po") also completes the pending fuel estimate
+from the remembered route.
 
 ### Training guide — how to make the bot smarter
 
