@@ -10,7 +10,7 @@ intents do. See ``csv_data.py`` for the exact format.
 
 from pathlib import Path
 
-from app.ai.csv_data import read_examples_csv
+from app.training.csv_data import read_examples_csv
 
 SEED_CSV_PATH = Path(__file__).resolve().parent / "seed_training_data.csv"
 

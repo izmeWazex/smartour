@@ -5,7 +5,54 @@ algorithms behind the chat system.
 
 ---
 
-## Session 2026-08-16 — Trainable intent model + CSV datasets
+## Session 2026-08-20 — Remove electric vehicle, add mio sporty motorcycle, simplify fuel calculations
+
+### Goal
+
+Simplify the fuel cost system by removing electric vehicle support and adding a "mio sporty type" motorcycle alias, while keeping the chat system focused on Ilocos tourist spot suggestions and fuel calculations.
+
+### What was built
+
+| Piece | File(s) | What it does |
+| ----- | ------- | ------------ |
+| Remove electric CAR_TYPE | `app/ai/embedded_data.py` | Removed electric vehicle from CAR_TYPES dict |
+| Add mio sporty alias | `app/ai/embedded_data.py` | Added "mio sporty", "mio", "mio sporty type" to motorcycle aliases |
+| Simplify fuel cost math | `app/ai/engine.py` | Removed electric branch from `_fuel_cost()` — all vehicles now use consumption-based calculation (L/100km × distance × price) |
+| Update help text | `app/ai/engine.py` | Removed electric from available car types in `_handle_help` |
+| Add more car type aliases | `app/ai/embedded_data.py` | Added Philippine-common car aliases: motorcycle (chopper, street), sedan (vios gx, corolla, altis), SUV (montero, patrol), van (hiace, urvan, lv, ace), pickup (l300, colt, boyracer), multicab (kaldi, uv express, f2) |
+
+### Changes summary
+
+1. **CAR_TYPES** in `embedded_data.py`: Removed `electric` key; motorcycle now includes `mio sporty`, `mio`, `mio sporty type` aliases plus new aliases (`chopper`, `street`). Sedan added `corolla`, `vios gx`, `vios e`, `altis`. SUV added `montero`, `patrol`. Van added `hiace`, `urvan`, `lv`, `ace`. Pickup added `l300`, `colt`, `boyracer`. Multicab added `kaldi`, `uv express`, `f2`. Consumption rates unchanged.
+
+2. **`_fuel_cost()`** in `engine.py`: Removed the `if car_id == "electric"` branch. All vehicles calculate liters needed as `(distance_km / 100) × consumption_per_100km` and cost as `liters × price_per_liter`.
+
+3. **`_fuel_estimate_block()`** in `engine.py`: Updated vehicle type prompt to no longer list "Electric".
+
+4. **Help text** in `_handle_help()`: Removed "electric" from available car types list; fuel types remain `gasoline`, `diesel`, `premium`.
+
+### New alias verification
+
+- ✅ "mio sporty" → motorcycle (3.0 L/100km)
+- ✅ "vios", "corolla" → sedan (8.5 L/100km)
+- ✅ "fortuner", "montero" → SUV (12.0 L/100km)
+- ✅ "hiace", "l300" → van/pickup respective consumption rates
+- ✅ All 6 car types produce correct fuel costs (e.g., sedan: ₱14.76 for 2.8km; motorcycle: ₱5.21 for 2.8km)
+
+### Run the system
+
+```bash
+cd backend
+.venv/Scripts/python -m uvicorn app.main:app --reload
+```
+
+Test with:
+- `"Tell me about Baluarte"` → spot description
+- `"How far is Bantay Church from Calle Crisologo?"` → distance  
+- `"From Calle Crisologo to Santa Maria Church using a sedan"` → distance + fuel cost
+- `"recommend heritage spots"` → recommended spots
+- `"using a mio sporty"` → detects as motorcycle
+- `"with a vios"` → detects as sedan
 
 ### Goal
 

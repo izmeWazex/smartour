@@ -9,14 +9,15 @@ import math
 from difflib import get_close_matches
 from typing import List, Optional, Tuple
 
-from app.ai.knowledge_base import (
+from app.knowledge.knowledge_base import (
     TOURIST_SPOTS,
     CAR_TYPES,
     FUEL_PRICES,
     DISTANCES_KM,
     CATEGORY_RECOMMENDATIONS,
+    MUNICIPAL_DISTANCES,
 )
-from app.ai.trainable_model import get_intent_model
+from app.training.trainable_model import get_intent_model
 
 
 # Helpers
@@ -171,17 +172,6 @@ def _fuel_cost(distance_km: float, car_id: str, fuel_type: str = "gasoline") -> 
     car = CAR_TYPES[car_id]
     price_per_liter = FUEL_PRICES.get(fuel_type, FUEL_PRICES["gasoline"])
 
-    if car_id == "electric":
-        kwh_per_100km = 15  # average EV
-        kwh_needed = (distance_km / 100) * kwh_per_100km
-        return {
-            "distance_km": distance_km,
-            "car": car["label"],
-            "fuel_type": "Electric",
-            "energy_needed": f"{kwh_needed:.1f} kWh",
-            "estimated_cost": "~₱0 (charging cost varies)",
-        }
-
     liters_needed = (distance_km / 100) * car["consumption_per_100km"]
     cost = liters_needed * price_per_liter
 
@@ -261,12 +251,91 @@ def _fuel_estimate_block(
     if not car_id:
         return (
             "Want a fuel estimate too? Tell me your vehicle type:\n"
-            "- Motorcycle, Sedan, SUV, Van, Pickup, Multicab, or Electric\n\n"
+            "- Motorcycle, Sedan, SUV, Van, Pickup, Multicab\n\n"
             "Example: _\"... using a sedan\"_"
         )
     fuel_type = _detect_fuel_type(message)
     distance = _estimate_distance(from_id, to_id)
     return _build_fuel_response(_fuel_cost(distance, car_id, fuel_type))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Municipality proximity helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Default reference municipality when user doesn't specify one
+DEFAULT_MUNICIPALITY = "Vigan City"
+
+# Max road distance (km) to consider "nearby" for recommendations
+# Anything beyond this shows in the "further away" section
+NEARBY_THRESHOLD_KM = 15.0
+
+
+def _get_municipality(spot_id: str) -> str:
+    """Return the municipality name for a spot."""
+    return TOURIST_SPOTS.get(spot_id, {}).get("location", "")
+
+
+def _get_municipal_distance(muni_a: str, muni_b: str) -> float:
+    """Return road distance between two municipalities in km.
+    Returns 0 if same municipality, inf if not found."""
+    if muni_a == muni_b:
+        return 0.0
+    key1 = (muni_a, muni_b)
+    key2 = (muni_b, muni_a)
+    d = MUNICIPAL_DISTANCES.get(key1) or MUNICIPAL_DISTANCES.get(key2)
+    return d if d is not None else float("inf")
+
+
+def _detect_reference_municipality(text: str, context: Optional[dict] = None) -> Optional[str]:
+    """Detect the reference municipality from the user's message.
+    Checks: 1) mentioned spot's municipality, 2) direct municipality name, 3) context."""
+    text_l = _normalize(text)
+
+    # 1) Spot mentioned in the message
+    spot_id = _fuzzy_match_spot(text)
+    if spot_id:
+        return _get_municipality(spot_id)
+
+    # 2) Direct municipality name match
+    all_municipalities = {_get_municipality(sid) for sid in TOURIST_SPOTS}
+    for muni in all_municipalities:
+        if muni and muni.lower() in text_l:
+            return muni
+
+    # 3) Context: last spot discussed
+    if context:
+        ctx_spot = context.get("spot_id")
+        if ctx_spot and ctx_spot in TOURIST_SPOTS:
+            return _get_municipality(ctx_spot)
+
+    return None
+
+
+def _sort_spots_by_proximity(spot_ids: List[str], reference_municipality: str) -> List[str]:
+    """Sort spots by distance from the reference municipality.
+    Spots in the same municipality come first, then by road distance."""
+    def _sort_key(sid: str) -> Tuple[float, int]:
+        muni = _get_municipality(sid)
+        dist = _get_municipal_distance(reference_municipality, muni)
+        # Same municipality = distance 0, then by original index to preserve category order
+        return (dist, spot_ids.index(sid))
+    return sorted(spot_ids, key=_sort_key)
+
+
+def _filter_nearby_spots(spot_ids: List[str], reference_municipality: str,
+                          threshold_km: float = NEARBY_THRESHOLD_KM) -> Tuple[List[str], List[str]]:
+    """Split spots into nearby and far groups based on municipal distance.
+    Returns (nearby_spots, far_spots)."""
+    nearby, far = [], []
+    for sid in spot_ids:
+        muni = _get_municipality(sid)
+        dist = _get_municipal_distance(reference_municipality, muni)
+        if dist <= threshold_km:
+            nearby.append(sid)
+        else:
+            far.append(sid)
+    return nearby, far
 
 
 def _detect_category(text: str) -> Optional[str]:
@@ -394,6 +463,33 @@ def _build_recommendation_list(spot_ids: List[str], title: str) -> str:
     return "\n".join(lines)
 
 
+def _build_proximity_recommendation(
+    spot_ids: List[str], title: str, reference_municipality: str
+) -> str:
+    """Build a recommendation list that prioritizes nearby spots."""
+    sorted_ids = _sort_spots_by_proximity(spot_ids, reference_municipality)
+    nearby, _ = _filter_nearby_spots(sorted_ids, reference_municipality)
+
+    lines = [f"**{title}**\n"]
+
+    if nearby:
+        for i, sid in enumerate(nearby[:6], 1):
+            s = TOURIST_SPOTS[sid]
+            dist = _get_municipal_distance(
+                reference_municipality, _get_municipality(sid)
+            )
+            dist_label = "" if dist == 0 else f" (~{dist:.0f} km)"
+            lines.append(
+                f"{i}. **{s['name']}** — {s['location']}{dist_label}\n"
+                f"   _{_truncate(s['description'])}_"
+            )
+    else:
+        lines.append("No nearby spots found for this category.")
+
+    lines.append("\nType the name of any spot and I'll give you more details!")
+    return "\n".join(lines)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Clarifying questions (used when the bot is unsure)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -445,9 +541,13 @@ def _extract_context(history: List[dict]) -> dict:
         content = msg.get("content") or ""
         role = msg.get("role")
         if role == "assistant":
-            # Assistant replies only set the topic; their text must not leak into route/car
             if not ctx["last_topic"]:
                 ctx["last_topic"] = _topic_of_reply(content)
+            # Also extract routes from assistant replies (e.g. "Distance from X to Y")
+            if not ctx["from_id"]:
+                route = _route_from_assistant_reply(content)
+                if route:
+                    ctx["from_id"], ctx["to_id"] = route
             continue
         route = _route_from_text(content)
         if route and not ctx["from_id"]:
@@ -465,12 +565,45 @@ def _extract_context(history: List[dict]) -> dict:
 def _topic_of_reply(content: str) -> Optional[str]:
     if "Fuel Estimate" in content or "Trip:" in content or "vehicle type" in content:
         return "fuel_cost"
-    if "Distance Estimate" in content:
+    if "Distance Estimate" in content or "Distance from" in content or "to where" in content:
         return "distance"
     if "Getting to" in content or "Location:" in content:
         return "describe"
     if "Must-See" in content or "**Top " in content or "**Recommended" in content:
         return "recommend"
+    return None
+
+
+def _route_from_assistant_reply(content: str) -> Optional[Tuple[str, str]]:
+    """Extract route from assistant replies like 'Distance from X to Y' or 'Trip: X → Y'."""
+    # Pattern: "Distance from **X** to **Y**"
+    m = re.search(
+        r"Distance from\s+\*\*(.+?)\*\*\s+to\s+\*\*(.+?)\*\*",
+        content, re.IGNORECASE
+    )
+    if m:
+        f = _fuzzy_match_spot(m.group(1).strip())
+        t = _fuzzy_match_spot(m.group(2).strip())
+        if f and t:
+            return f, t
+    # Pattern: "Trip: X → Y" or "Trip: X -> Y"
+    m = re.search(
+        r"Trip:\s+(.+?)\s+[→->]+\s+(.+?)(?:\n|$)",
+        content, re.IGNORECASE
+    )
+    if m:
+        f = _fuzzy_match_spot(m.group(1).strip())
+        t = _fuzzy_match_spot(m.group(2).strip())
+        if f and t:
+            return f, t
+    # Pattern: "From: **X**" and "To: **Y**" on separate lines
+    from_m = re.search(r"From:\s+\*\*(.+?)\*\*", content, re.IGNORECASE)
+    to_m = re.search(r"To:\s+\*\*(.+?)\*\*", content, re.IGNORECASE)
+    if from_m and to_m:
+        f = _fuzzy_match_spot(from_m.group(1).strip())
+        t = _fuzzy_match_spot(to_m.group(1).strip())
+        if f and t:
+            return f, t
     return None
 
 
@@ -509,21 +642,33 @@ def _fill_route(
     """Fill missing route endpoints from context (one-spot swap or full reuse)."""
     if from_id and to_id:
         return from_id, to_id
-    ctx_from, ctx_to = context.get("from_id"), context.get("to_id")
-    if not ctx_from or not ctx_to:
-        return from_id, to_id
 
+    ctx_from, ctx_to = context.get("from_id"), context.get("to_id")
+    ctx_spot = context.get("spot_id")
+
+    # Use from_id/to_id from context if available
+    if ctx_from and ctx_to:
+        msg_spots = _spots_in_order(message)
+        text_l = _normalize(message)
+        if len(msg_spots) == 1:
+            spot = msg_spots[0]
+            if re.search(r"\bfrom\b", text_l):
+                return (spot, ctx_to) if spot != ctx_to else (spot, ctx_from)
+            if re.search(r"\bto\b", text_l):
+                return (ctx_from, spot) if spot != ctx_from else (ctx_to, spot)
+            return (ctx_from, spot) if spot != ctx_from else (ctx_from, ctx_to)
+        return ctx_from, ctx_to
+
+    # If only one location found in message, use spot_id from context as the other
     msg_spots = _spots_in_order(message)
-    text_l = _normalize(message)
-    if len(msg_spots) == 1:
-        spot = msg_spots[0]
-        if re.search(r"\bfrom\b", text_l):
-            return (spot, ctx_to) if spot != ctx_to else (spot, ctx_from)
-        if re.search(r"\bto\b", text_l):
-            return (ctx_from, spot) if spot != ctx_from else (ctx_to, spot)
-        # No direction keyword — treat the mentioned spot as the destination
-        return (ctx_from, spot) if spot != ctx_from else (ctx_from, ctx_to)
-    return ctx_from, ctx_to
+    if len(msg_spots) == 1 and ctx_spot:
+        return (ctx_spot, msg_spots[0]) if msg_spots[0] != ctx_spot else (ctx_spot, ctx_spot)
+
+    # If no locations in message but context has a spot, use it as the origin
+    if not msg_spots and ctx_spot:
+        return (ctx_spot, None)
+
+    return from_id, to_id
 
 
 # Main engine
@@ -555,7 +700,7 @@ class SmartourAI:
         context = _extract_context(history)
 
         # Short follow-ups naming a spot but no intent keywords reuse the last topic
-        if intent == "unknown" and _spots_in_order(message) \
+        if intent == "unknown" and (_spots_in_order(message) or _fuzzy_match_spot(message)) \
                 and context.get("last_topic") in ("fuel_cost", "distance", "describe"):
             intent = context["last_topic"]
 
@@ -612,18 +757,20 @@ class SmartourAI:
 
     def _handle_help(self, message: str = "", context: Optional[dict] = None) -> str:
         return (
-            "**Smartour AI — What I can do:**\n\n"
+"**Smartour AI — What I can do:**\n\n"
             "1. **Recommend spots** — \"Suggest heritage spots\" / \"Best places in Ilocos Sur\"\n"
             "2. **Describe a spot** — \"Tell me about Baluarte\" / \"What is Pinsal Falls?\"\n"
             "3. **Fuel cost** — \"From Calle Crisologo to UNP using a SUV\"\n"
-            "4. **Distance** — \"How far is Bantay Church from Plaza Salcedo?\"\n\n"
-            "**Available car types:** motorcycle, sedan, SUV, van, pickup, multicab, electric\n"
+            "4. **Distance** — \"How far is Bantay Church from Vigan Cathedral?\"\n\n"
+            "**Available car types:** motorcycle, sedan, SUV, van, pickup, multicab\n"
             "**Fuel types:** gasoline (default), diesel, premium\n\n"
             "Try asking anything about Ilocos Sur!"
         )
 
     def _handle_recommend(self, message: str, context: Optional[dict] = None) -> str:
         category = _detect_category(message)
+        ref_muni = _detect_reference_municipality(message, context) or DEFAULT_MUNICIPALITY
+
         if category and category in CATEGORY_RECOMMENDATIONS:
             spot_ids = CATEGORY_RECOMMENDATIONS[category]
             titles = {
@@ -635,12 +782,14 @@ class SmartourAI:
                 "adventure": "Adventure Spots",
                 "must_see": "Must-See Spots in Ilocos Sur",
             }
-            return _build_recommendation_list(spot_ids, titles.get(category, "Recommended Spots"))
+            title = titles.get(category, "Recommended Spots")
+            return _build_proximity_recommendation(spot_ids, title, ref_muni)
 
         # Default: show must-see
-        return _build_recommendation_list(
+        return _build_proximity_recommendation(
             CATEGORY_RECOMMENDATIONS["must_see"],
-            "Top Must-See Spots in Ilocos Sur"
+            "Top Must-See Spots in Ilocos Sur",
+            ref_muni,
         )
 
     def _handle_describe(self, message: str, context: Optional[dict] = None) -> str:
@@ -681,10 +830,13 @@ class SmartourAI:
                 from_id = _fuzzy_match_spot(to_from_match.group(2).strip())
 
         if not from_id or not to_id:
-            # Fallback: pick first two spots found anywhere in the message
             found = _spots_in_order(message)[:2]
             if len(found) == 2:
                 from_id, to_id = found[0], found[1]
+            elif len(found) == 1:
+                ctx_spot = context.get("spot_id")
+                if ctx_spot and found[0] != ctx_spot:
+                    from_id, to_id = ctx_spot, found[0]
 
         # Conversation memory: reuse the route from the previous exchange
         if not from_id or not to_id:
@@ -713,6 +865,14 @@ class SmartourAI:
             )
 
         if not from_id or not to_id:
+            # If we have one location from context, ask for the other
+            if from_id and not to_id:
+                from_name = TOURIST_SPOTS[from_id]["name"]
+                return (
+                    f"I found your vehicle: **{CAR_TYPES[car_id]['label']}**\n\n"
+                    f"From **{from_name}** to where?\n"
+                    "Example: _\"From Calle Crisologo to UNP using a sedan\"_"
+                )
             return (
                 f"I found your vehicle: **{CAR_TYPES[car_id]['label']}**\n\n"
                 "But I need **two locations** to estimate fuel cost.\n"
@@ -766,6 +926,11 @@ class SmartourAI:
             found = _spots_in_order(message)
             if len(found) >= 2:
                 from_id, to_id = found[0], found[1]
+            elif len(found) == 1:
+                # Only one spot found — use context for the other
+                ctx_spot = context.get("spot_id")
+                if ctx_spot and found[0] != ctx_spot:
+                    from_id, to_id = ctx_spot, found[0]
 
         # Conversation memory: reuse the route from the previous exchange
         if not from_id or not to_id:
@@ -785,6 +950,14 @@ class SmartourAI:
             if _wants_fuel(message):
                 reply += "\n\n" + _fuel_estimate_block(from_id, to_id, message, context)
             return reply
+
+        # Only one location from context — ask for the destination
+        if from_id and not to_id:
+            from_name = TOURIST_SPOTS[from_id]["name"]
+            return (
+                f"Distance from **{from_name}** to where?\n\n"
+                "Example: _\"How far is {from_name} from Bantay Church?\"_"
+            )
 
         return (
             "Please specify two locations.\n"

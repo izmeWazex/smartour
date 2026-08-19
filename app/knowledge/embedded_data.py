@@ -1,6 +1,6 @@
 """
 Embedded knowledge base (fallback dataset).
-Used when MySQL is not configured; also the seed source for the DB import.
+Used when PostgreSQL is not configured; also the seed source for the DB import.
 Covers: spots, coordinates, fuel estimation, recommendations.
 """
 
@@ -174,37 +174,32 @@ CAR_TYPES: Dict[str, dict] = {
     "motorcycle": {
         "label": "Motorcycle / Motorbike",
         "consumption_per_100km": 3.0,
-        "aliases": ["motorcycle", "motorbike", "motor", "bike", "moto"],
+        "aliases": ["motorcycle", "motorbike", "mio sporty", "mio", "mio sporty type", "motor", "bike", "moto", "chopper", "street", "yamaha", "honda", "suzi"],
     },
     "sedan": {
         "label": "Sedan (e.g. Toyota Vios, Honda City)",
         "consumption_per_100km": 8.5,
-        "aliases": ["sedan", "car", "vios", "civic", "city", "altis", "camry"],
+        "aliases": ["sedan", "car", "vios", "civic", "city", "altis", "camry", "corolla", "vios gx", "vios e"],
     },
     "suv": {
         "label": "SUV (e.g. Ford Everest, Toyota Fortuner)",
         "consumption_per_100km": 12.0,
-        "aliases": ["suv", "fortuner", "everest", "prado", "mux", "mu-x", "crv", "cr-v"],
+        "aliases": ["suv", "fortuner", "everest", "prado", "mux", "mu-x", "crv", "cr-v", "montero", "patrol", "escape"],
     },
     "van": {
         "label": "Van (e.g. Toyota Hiace, Foton)",
         "consumption_per_100km": 13.5,
-        "aliases": ["van", "hiace", "foton", "urvan", "grandia"],
+        "aliases": ["van", "hiace", "foton", "urvan", "grandia", "lv", "vanette", "ace", "super van"],
     },
     "pickup": {
         "label": "Pickup Truck (e.g. Toyota Hilux, Ford Ranger)",
         "consumption_per_100km": 11.0,
-        "aliases": ["pickup", "hilux", "ranger", "truck", "l300"],
+        "aliases": ["pickup", "hilux", "ranger", "truck", "l300", "colt", "boyracer", "single cab"],
     },
     "multicab": {
         "label": "Multicab / Jeepney",
         "consumption_per_100km": 9.0,
-        "aliases": ["multicab", "jeepney", "jeep", "multicab"],
-    },
-    "electric": {
-        "label": "Electric Vehicle",
-        "consumption_per_100km": 0.0,  # kWh based, handle separately
-        "aliases": ["electric", "ev", "tesla", "atto", "byd"],
+        "aliases": ["multicab", "jeepney", "jeep", "multicab", "kaldi", "uv express", "f2"],
     },
 }
 

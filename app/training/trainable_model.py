@@ -19,14 +19,14 @@ from sklearn.metrics import accuracy_score
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.pipeline import Pipeline
 
-from app.ai.csv_data import DATASET_CSV_PATH
+from app.training.csv_data import DATASET_CSV_PATH
 
 logger = logging.getLogger("smartour.model")
 
 # Paths & constants
 
-BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
-DATA_DIR = BACKEND_DIR / "data"
+TRAINING_DIR = Path(__file__).resolve().parent
+DATA_DIR = TRAINING_DIR / "data"
 MODEL_PATH = DATA_DIR / "intent_model.joblib"
 
 # Below this confidence the engine falls back to rule-based detection
@@ -253,8 +253,8 @@ def get_intent_model() -> TrainableIntentModel:
     """App-wide model; trained from the dataset CSV, saved joblib, or seed."""
     global _model
     if _model is None:
-        from app.ai.csv_data import DATASET_CSV_PATH, read_examples_csv
-        from app.ai.seed_training_data import SEED_TRAINING_EXAMPLES
+        from app.training.csv_data import DATASET_CSV_PATH, read_examples_csv
+        from app.training.seed_training_data import SEED_TRAINING_EXAMPLES
 
         _model = TrainableIntentModel()
         if DATASET_CSV_PATH.exists():

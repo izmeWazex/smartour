@@ -13,8 +13,8 @@ scikit-learn>=1.4.0
 joblib>=1.3.0
 numpy>=1.26.0
 
-# MySQL knowledge-base storage (optional; embedded fallback if not set up)
-pymysql>=1.1.0
+# PostgreSQL knowledge-base storage (optional; embedded fallback if not set up)
+psycopg2-binary>=2.9.9
 
 # ── Dev / tests only (not required to run the server) ─────────────────────────
 # httpx  # needed by fastapi.testclient (used for quick inline API checks)

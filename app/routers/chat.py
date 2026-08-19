@@ -10,7 +10,7 @@ from app.models.chat import (
     ClearHistoryResponse,
     MessageRole,
 )
-from app.ai.engine import smartour_ai
+from app.core.engine import smartour_ai
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 

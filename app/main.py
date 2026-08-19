@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
 from app.middleware.logging import RequestLoggingMiddleware
-from app.routers import ai, chat
+from app.routers import chat
 
 app = FastAPI(
     title="Smartour API",
@@ -25,7 +25,6 @@ app.add_middleware(
 )
 
 app.include_router(chat.router, prefix="/api/v1")
-app.include_router(ai.router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Health"])
@@ -35,7 +34,7 @@ def root():
 
 @app.get("/health", tags=["Health"])
 def health_check():
-    from app.ai.knowledge_base import data_source
+    from app.knowledge.knowledge_base import data_source
 
     return {
         "status": "healthy",

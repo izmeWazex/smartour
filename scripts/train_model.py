@@ -22,9 +22,9 @@ if hasattr(sys.stdout, "reconfigure"):
 # Allow running as `python scripts/train_model.py` from the backend/ dir
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.ai.csv_data import DATASET_CSV_PATH, read_examples_csv, write_examples_csv  # noqa: E402
-from app.ai.trainable_model import TrainingError, get_intent_model, MODEL_PATH  # noqa: E402
-from app.ai.seed_training_data import SEED_TRAINING_EXAMPLES  # noqa: E402
+from app.training.csv_data import DATASET_CSV_PATH, read_examples_csv, write_examples_csv  # noqa: E402
+from app.training.trainable_model import TrainingError, get_intent_model, MODEL_PATH  # noqa: E402
+from app.training.seed_training_data import SEED_TRAINING_EXAMPLES  # noqa: E402
 
 
 def _print_help() -> None:

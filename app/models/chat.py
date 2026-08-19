@@ -23,7 +23,7 @@ class ChatMessageRequest(BaseModel):
         "json_schema_extra": {
             "example": {
                 "session_id": "abc-123",
-                "message": "What are the best tours in Kuala Lumpur?",
+                "message": "What are the best tours in vign city?",
             }
         }
     }

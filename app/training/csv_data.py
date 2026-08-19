@@ -8,8 +8,8 @@ import io
 from pathlib import Path
 from typing import List, Optional, Union
 
-# backend/data/ — user datasets (gitignored)
-DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+# app/training/data/ — generated runtime data (gitignored)
+DATA_DIR = Path(__file__).resolve().parent / "data"
 DATASET_CSV_PATH = DATA_DIR / "training_data.csv"
 
 EXPECTED_HEADER = ("text", "intent")
