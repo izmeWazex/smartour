@@ -1,13 +1,15 @@
 # Python virtual environment
-*.venv/
+.venv/
+venv/
+env/
 
 # Python cache
 __pycache__/
 *.py[cod]
+*$py.class
 
 # Environment variables
 .env
-backend/.env
 
 # IDE
 .vscode/
@@ -27,4 +29,10 @@ dist/
 .DS_Store
 Thumbs.db
 
-.gitignore
+# Models / large binary files
+models/
+*.pt
+*.pth
+*.onnx
+*.pkl
+*.safetensors

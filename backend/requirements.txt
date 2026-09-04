@@ -1,5 +1,6 @@
-sentence-transformers
 fastapi
 uvicorn
 python-dotenv
 pandas
+scikit-learn
+pytest
