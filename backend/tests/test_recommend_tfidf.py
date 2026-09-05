@@ -53,6 +53,22 @@ def test_recommend_category_is_case_insensitive(recommender):
     assert results.iloc[0]["name"] == "Mindoro Beach"
 
 
+def test_recommend_category_list_filter(recommender):
+    results = recommender.recommend("something", top_n=4, category=["beach", "food"])
+    assert set(results["category"]) == {"beach", "food"}
+    assert len(results) == 2
+
+
+def test_recommend_category_list_is_case_insensitive(recommender):
+    results = recommender.recommend("something", top_n=4, category=["BEACH", "NATURE"])
+    assert set(results["category"]) == {"beach", "nature"}
+
+
+def test_recommend_empty_category_list_means_no_filter(recommender):
+    results = recommender.recommend("something", top_n=4, category=[])
+    assert len(results) == 4
+
+
 def test_recommend_unknown_category_returns_empty(recommender):
     results = recommender.recommend("something", top_n=4, category="shopping")
     assert len(results) == 0

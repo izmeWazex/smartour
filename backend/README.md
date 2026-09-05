@@ -25,6 +25,24 @@ API works offline.
 Because the algorithm runs on word weights, the bot understands queries like
 `gusto ko kumain ng bagnet` even when the CSV never contains those exact words.
 
+## How intent classification works
+
+`src/intent/classify.py` is a hybrid classifier that also uses no pre-trained model:
+
+1. **Keyword pass** — the message is scanned for `CATEGORY_KEYWORDS` substrings
+   (e.g. "bagnet" → food, "museum" → historical); every category that hits is
+   returned.
+2. **TF-IDF fallback** — only when no keyword matches, the message is vectorized
+   with a word-level `TfidfVectorizer(stop_words="english")` fitted on the spot
+   descriptions grouped by category, and scored against each category's
+   "document" with cosine similarity. The best category is returned when it
+   clears `SIMILARITY_THRESHOLD`; random text scores ~0 and returns nothing.
+
+Because the fallback learns from the real spot descriptions, it catches wording
+the keyword lists miss — "water" and "clean" point to nature, "swimming" to
+beach — without any pre-trained model. Stop words are stripped so common words
+can't dominate the four tiny category documents.
+
 ## Setup
 
 ```bash
@@ -71,11 +89,19 @@ Response:
 }
 ```
 
-`category` is optional. When omitted, **every** spot is ranked purely by content match
-(TF-IDF cosine similarity) — the bot recommends real spots, not spots of a detected
-category. Category keywords found in the query are reported as `detected_categories`
-and used only as a fallback when the query shares no words with any description
-(e.g. Tagalog-only phrasing). Pass `category` explicitly to hard-filter to one category.
+`category` is optional. When omitted, any categories detected in the chat message
+(see "How intent classification works") hard-filter the candidates, and the top
+spots **within those categories** are then ranked by content match (TF-IDF cosine
+similarity). Design note: the filter only decides *which* spots are eligible, and
+content match still decides *which one* wins — so `gusto ko kumain ng bagnet`
+returns the bagnet-specific eatery (Bantay Camarin Bagnet House), not just any
+food spot. When neither an explicit `category` nor a detected category exists,
+every spot is ranked purely by content match. If a filter matches no spots — a
+client-sent `category` name the CSV doesn't use, or chat-detected categories that
+drifted from the CSV — the API retries with the chat-detected categories and then
+with no filter, so it never returns an empty list while spots exist. Pass
+`category` explicitly to hard-filter to a single category (it overrides the
+detected ones).
 
 ## Tests
 

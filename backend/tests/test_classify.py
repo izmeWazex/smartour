@@ -37,3 +37,15 @@ def test_case_insensitive():
 
 def test_substring_matching():
     assert extract_category("beachhh vibes only") == ["beach"]
+
+
+def test_fallback_catches_unlisted_words():
+    assert extract_category("Is the water clean there?") == ["nature"]
+
+
+def test_fallback_catches_word_forms():
+    assert extract_category("looking for a calm seaside spot") == ["beach"]
+
+
+def test_fallback_rejects_noise():
+    assert extract_category("asdkjaskjd random text") is None
