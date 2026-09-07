@@ -28,6 +28,11 @@ dist/
 # OS files
 .DS_Store
 Thumbs.db
+# OS generated files
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+Trashes
 
 # Models / large binary files
 models/
@@ -36,3 +41,14 @@ models/
 *.onnx
 *.pkl
 *.safetensors
+# Node.js
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Flutter
+.dart_tool/
+build/
+android/
+ios/

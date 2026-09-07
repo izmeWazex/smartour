@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from config import RAW_CSV_PATH
@@ -37,6 +37,7 @@ class Spot(BaseModel):
     name: str
     category: str
     city: str
+    description: str | None = None
     similarity: float
 
 
@@ -57,8 +58,39 @@ def health() -> dict:
     }
 
 
+@app.get("/spot/{place_name}")
+def spot_detail(place_name: str) -> dict:
+    """Get details and description for a specific tourist spot."""
+    recommender = get_recommender()
+    spot = recommender.get_spot_description(place_name)
+    if spot is None:
+        raise HTTPException(status_code=404, detail=f"Spot '{place_name}' not found")
+    return spot
+
+
 @app.post("/recommend", response_model=RecommendResponse)
 def recommend(req: RecommendRequest) -> RecommendResponse:
+    # Check for specific place name match first - clarify what user is asking
+    recommender = get_recommender()
+    spot = recommender.get_spot_description(req.query)
+    
+    if spot:
+        # User is asking about a specific place - clarify and return description
+        # This keeps get_spot_description() separate for future features
+        return RecommendResponse(
+            query=req.query,
+            detected_categories=[],
+            results=[Spot(
+                spot_id=spot["spot_id"],
+                name=str(spot["name"]),
+                category=spot["category"],
+                city=spot["city"],
+                description=spot["description"],
+                similarity=1.0,
+            )]
+        )
+    
+    # No specific place match - proceed with normal intent classification
     detected = extract_category(req.query) or []
 
     recommender = get_recommender()
@@ -91,6 +123,7 @@ def recommend(req: RecommendRequest) -> RecommendResponse:
             name=row.name,
             category=row.category,
             city=row.city,
+            description=recommender.df[recommender.df["spot_id"] == int(row.spot_id)]["description"].values[0] if int(row.spot_id) in recommender.df["spot_id"].values else None,
             similarity=round(float(row.similarity), 4),
         )
         for row in results.itertuples(index=False)

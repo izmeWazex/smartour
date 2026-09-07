@@ -23,6 +23,27 @@ class TfidfRecommender:
             f"| categories: {sorted(self.df['category'].str.lower().unique().tolist())}"
         )
 
+    def get_spot_description(self, place_name: str) -> dict | None:
+        """Search CSV for a spot by name and return its description."""
+        df = self.df
+        # Exact match first
+        match = df[df["name"].str.lower() == place_name.lower()]
+        if match.empty:
+            # Partial match - e.g., "Crisologo" → "Calle Crisologo"
+            match = df[df["name"].str.lower().str.contains(place_name.lower())]
+        if not match.empty:
+            row = match.iloc[0]
+            return {
+                "spot_id": int(row.spot_id),
+                "name": row["name"],
+                "category": row["category"],
+                "city": row["city"],
+                "description": row["description"],
+                "latitude": float(row["latitude"]),
+                "longitude": float(row["longitude"]),
+            }
+        return None
+
     def recommend(
         self,
         user_query: str,
